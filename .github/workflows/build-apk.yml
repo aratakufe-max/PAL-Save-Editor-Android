@@ -42,12 +42,9 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
+          yes | sdkmanager --licenses || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Setup Gradle
@@ -76,4 +73,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PAL-Save-Editor-debug
-          path: "**/app-debug.apk"
+          path: "**/android/app/build/outputs/apk/debug/app-debug.apk"
