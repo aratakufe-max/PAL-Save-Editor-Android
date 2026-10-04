@@ -1,0 +1,79 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/build-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find and extract project
+        run: |
+          ZIP="$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$ZIP"
+          rm -rf build-src
+          mkdir build-src
+          unzip -q "$ZIP" -d build-src
+          ROOT="$(find build-src -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build web
+        run: |
+          cd "$PROJECT_ROOT"
+          npm ci
+          npm run build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.7"
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_ROOT"
+
+          rm -rf android/app/src/main/assets
+          mkdir -p android/app/src/main/assets
+          cp -R dist/. android/app/src/main/assets/
+
+          cat > android/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.6.1' apply false
+          }
+          EOF
+
+          cd android
+          gradle :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PAL-Save-Editor-debug
+          path: "**/app-debug.apk"
